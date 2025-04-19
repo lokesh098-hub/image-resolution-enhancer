@@ -1,0 +1,176 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resolution Enhancer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            padding: 20px;
+            text-align: center;
+        }
+        .image-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-box {
+            flex: 1;
+            min-width: 300px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #progress {
+            margin-top: 10px;
+            color: #333;
+        }
+        @media (max-width: 600px) {
+            .image-container {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Resolution Enhancer</h1>
+        <input type="file" id="imageInput" accept="image/*">
+        <button onclick="enhanceImage()">Enhance Image</button>
+        <div id="progress"></div>
+        <div class="image-container">
+            <div class="image-box">
+                <h3>Original Image</h3>
+                <img id="originalImage" alt="Original Image">
+            </div>
+            <div class="image-box">
+                <h3>Enhanced Image</h3>
+                <img id="enhancedImage" alt="Enhanced Image">
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@upscalerjs/core@1.0.0/dist/upscaler.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script>
+        const upscaler = new Upscaler();
+        const imageInput = document.getElementById('imageInput');
+        const originalImage = document.getElementById('originalImage');
+        const enhancedImage = document.getElementById('enhancedImage');
+        const progressDiv = document.getElementById('progress');
+
+        imageInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImage.src = e.target.result;
+                    enhancedImage.src = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function enhanceImage() {
+            if (!imageInput.files[0]) {
+                alert('Please select an image first!');
+                return;
+            }
+
+            progressDiv.textContent = 'Enhancing image... Please wait.';
+            
+            try {
+                const file = imageInput.files[0];
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+
+                img.onload = async () => {
+                    const enhancedImg = await upscaler.upscale(img, {
+                        scale: 2,
+                        onProgress: (progress) => {
+                            progressDiv.textContent = `Progress: ${Math.round(progress * 100)}%`;
+                        }
+                    });
+                    
+                    enhancedImage.src = enhancedImg;
+                    progressDiv.textContent = 'Enhancement complete!';
+                    URL.revokeObjectURL(img.src);
+                };
+            } catch (error) {
+                console.error('Error enhancing image:', error);
+                progressDiv.textContent = 'Error enhancing image. Please try again.';
+            }
+        }
+    </script>
+</body>
+</html>
